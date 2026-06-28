@@ -1,7 +1,19 @@
+import sys
+import subprocess
+
+# --- FOOLPROOF AUTO-INSTALLER FOR STREAMLIT CLOUD ---
+# This forces the cloud server to install libraries directly if requirements.txt fails
+try:
+    import yfinance as yf
+    import pandas as pd
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "yfinance", "pandas"])
+    import yfinance as yf
+    import pandas as pd
+# ----------------------------------------------------
+
 import datetime
-import pandas as pd
 import streamlit as st
-import yfinance as yf
 
 # Set up page styling
 st.set_page_config(page_title="Nifty 50 Deep Analyst", page_icon="📈", layout="wide")
