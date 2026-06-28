@@ -6,7 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # 1. PREMIUM CORES & LAYOUT THEME OVERRIDES
-st.set_page_config(page_title="Nifty 50 Terminal", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Nifty 50 Nischal", page_icon="📈", layout="wide")
 
 st.markdown("""
     <style>
