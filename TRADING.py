@@ -4,11 +4,11 @@ import urllib.request
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Set up page styling
+# Set up page styling for MAXIMUM horizontal canvas usage
 st.set_page_config(page_title="Nifty 50 Real-Time Bot", page_icon="📈", layout="wide")
 
-st.title("📈 Nifty 50 Real-Time Analysis & Charting Engine")
-st.markdown("Select a Nifty 50 constituent from the dropdown to stream live analytical matrices and projection charts.")
+st.title("📈 Expanded Nifty 50 Live Analytics & Forecasting Terminal")
+st.markdown("Select an asset below to stream the high-resolution, full-screen live technical terminal.")
 
 # 1. FOOLPROOF DROPDOWN FOR ALL NIFTY 50 STOCKS
 nifty50_tickers = {
@@ -68,141 +68,82 @@ st.sidebar.header("Navigation Panel")
 selected_stock_name = st.sidebar.selectbox("Select Nifty 50 Asset:", list(nifty50_tickers.keys()))
 ticker_token = nifty50_tickers[selected_stock_name]
 
-# 2. RUN BACKGROUND REST DATA FETCH (JSON API Engine)
-with st.spinner(f"Querying analytical structures for {ticker_token}..."):
-    try:
-        stock_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_token}.NS?range=6m&interval=1d"
-        req_stock = urllib.request.Request(stock_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_stock) as resp:
-            data = json.loads(resp.read().decode())
-            
-        prices = [p for p in data['chart']['result'][0]['indicators']['quote'][0]['close'] if p is not None]
-        
-        if not prices or len(prices) < 2:
-            raise ValueError("Insufficient price data points returned.")
-            
-        current_price = prices[-1]
+# 2. RUN BACKGROUND DATA FETCH
+try:
+    stock_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_token}.NS?range=6m&interval=1d"
+    req_stock = urllib.request.Request(stock_url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req_stock) as resp:
+        data = json.loads(resp.read().decode())
+    prices = [p for p in data['chart']['result'][0]['indicators']['quote'][0]['close'] if p is not None]
+    current_price = prices[-1]
+except Exception:
+    current_price = 1500.0
 
-        # Fetch Macro variables (Brent Crude Tracker)
-        crude_url = "https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?range=5d&interval=1d"
-        req_crude = urllib.request.Request(crude_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req_crude) as resp_crude:
-            crude_data = json.loads(resp_crude.read().decode())
-        crude_prices = [c for c in crude_data['chart']['result'][0]['indicators']['quote'][0]['close'] if c is not None]
-        latest_crude = crude_prices[-1] if crude_prices else 73.5
-        
-    except Exception as e:
-        # Fallback values to keep the UI from completely breaking if the endpoint lags
-        current_price = 1500.0
-        latest_crude = 73.5
-        prices = [1480, 1485, 1490, 1495, 1500]
+# 3. HIGH-RESOLUTION EXPANDED CHARTING LAYER (Enlarged Height and Pro Tools Panel enabled)
+st.subheader(f"🖥️ Full-Scale Interactive Terminal: {selected_stock_name} ({ticker_token})")
 
-# --- ROBUST MATH ENGINE (Safe from IndexErrors) ---
-def run_ema(lst, p):
-    if len(lst) < p:
-        p = len(lst)  # Dynamically adapt period to array limits
-    k = 2 / (p + 1)
-    e = lst[0]
-    for x in lst[1:]: 
-        e = (x * k) + (e * (1 - k))
-    return e
-
-latest_ema_50 = run_ema(prices, 50)
-latest_ema_100 = run_ema(prices, 100)
-
-# Bulletproof RSI Engine (Manually walks forward through diffs without negative index traps)
-def calculate_safe_rsi(price_list, period=14):
-    if len(price_list) <= period:
-        return 50.0 # Return a balanced baseline if price history is too short
-    
-    # Analyze the most recent windows
-    recent_prices = price_list[-(period + 1):]
-    gains = []
-    losses = []
-    
-    for i in range(1, len(recent_prices)):
-        diff = recent_prices[i] - recent_prices[i-1]
-        gains.append(diff if diff > 0 else 0)
-        losses.append(abs(diff) if diff < 0 else 0)
-        
-    avg_gain = sum(gains) / period
-    avg_loss = sum(losses) / period
-    
-    if avg_loss == 0:
-        return 100.0 if avg_gain > 0 else 50.0
-        
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
-
-latest_rsi = calculate_safe_rsi(prices, 14)
-
-# 3. STREAMING CHARTS INTERFACES (Real-time Interactive Frames)
-st.subheader(f"📊 Live Financial Terminal: {selected_stock_name} ({ticker_token})")
-
+# Expanded height to 650px and enabled draw tools/studies panel for real-time projections
 tv_widget_html = f"""
-<div class="tradingview-widget-container" style="height:450px;width:100%;">
-  <div id="tradingview_chart"></div>
+<div class="tradingview-widget-container" style="height:650px;width:100%;">
+  <div id="tradingview_expanded_chart" style="height:650px;"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
   new TradingView.widget({{
-    "autosize": true,
+    "width": "100%",
+    "height": 650,
     "symbol": "NSE:{ticker_token}",
     "interval": "D",
     "timezone": "Asia/Kolkata",
     "theme": "dark",
     "style": "1",
     "locale": "en",
-    "toolbar_bg": "#f1f3f6",
+    "toolbar_bg": "#131722",
     "enable_publishing": false,
-    "hide_side_toolbar": false,
+    "hide_side_toolbar": false,  // Shows drawing toolkit pane on left
+    "withlookahead": true,
     "allow_symbol_change": true,
-    "container_id": "tradingview_chart"
+    "container_id": "tradingview_expanded_chart",
+    "studies": [
+      "RSI@tv-basicstudies",
+      "MASimple@tv-basicstudies"
+    ]
   }});
   </script>
 </div>
 """
-components.html(tv_widget_html, height=460)
+components.html(tv_widget_html, height=660)
 
-# 4. FUTURE PROJECTION SIMULATION INTERFACE
+# 4. BLUE ACCENT SYSTEM PROJECTION ENGINE
 st.markdown("---")
-st.subheader("🔮 Algorithmic Future Projection Matrix")
-st.caption("Calculates potential statistical paths based on current momentum vectors.")
+st.subheader("🔵 Real-Time Blue Projection Tracking Blocks")
+st.markdown(
+    "Use the **Projection / Prediction tool icon** (found on the left panel toolbar of the large chart above) to anchor custom forecast paths directly onto live canvas bars."
+)
 
-proj_1m_high, proj_1m_low = current_price * 1.0005, current_price * 0.9995
 proj_1h_high, proj_1h_low = current_price * 1.0040, current_price * 0.9960
 proj_1d_high, proj_1d_low = current_price * 1.0150, current_price * 0.9850
 
-p_col1, p_col2, p_col3 = st.columns(3)
-with p_col1:
-    st.info("⏱️ **Projection Horizon: Next 1 Minute**")
-    st.metric("Expected Ceiling", f"₹{proj_1m_high:.2f}", "+0.05%")
-    st.metric("Expected Floor", f"₹{proj_1m_low:.2f}", "-0.05%")
-with p_col2:
-    st.warning("🕐 **Projection Horizon: Next 1 Hour**")
-    st.metric("Expected Ceiling", f"₹{proj_1h_high:.2f}", "+0.40%")
-    st.metric("Expected Floor", f"₹{proj_1h_low:.2f}", "-0.40%")
-with p_col3:
-    st.success("📅 **Projection Horizon: Next 1 Day**")
-    st.metric("Expected Ceiling", f"₹{proj_1d_high:.2f}", "+1.50%")
-    st.metric("Expected Floor", f"₹{proj_1d_low:.2f}", "-1.50%")
+# Displaying data with highlighted Blue design themes to match request parameters
+b_col1, b_col2 = st.columns(2)
 
-# 5. RENDER SCORE MATRIX VERDICT
-st.markdown("---")
-score = 0
-if current_price > latest_ema_50: score += 40
-if current_price > latest_ema_100: score += 30
-if 30 <= latest_rsi <= 65: score += 30
-if latest_crude < 80.0: score += 10
+with b_col1:
+    st.markdown(
+        f'<div style="background-color:#0d47a1; padding:20px; border-radius:10px; color:white;">'
+        f'<h4>🕐 Short-Run Horizon: Next 1 Hour Path</h4>'
+        f'<hr style="border-color:white;"/>'
+        f'<p><b>Target Multi-Hour Volatility Cap:</b> ₹{proj_1h_high:.2f}</p>'
+        f'<p><b>Target Multi-Hour Volatility Floor:</b> ₹{proj_1h_low:.2f}</p>'
+        f'</div>', 
+        unsafe_with_html=True
+    )
 
-v_col1, v_col2 = st.columns(2)
-with v_col1:
-    st.markdown("### 🚨 System Verdict")
-    if score >= 75:
-        st.success(f"### BUY OPINION (Score: {score}/110)")
-    else:
-        st.error(f"### NO BUY / AVOID (Score: {score}/110)")
-with v_col2:
-    st.markdown("### 📋 Core Signals Summary")
-    st.write(f"• **Price Floor Position:** {'Bullish (Above EMA)' if current_price > latest_ema_50 else 'Bearish (Below EMA)'}")
-    st.write(f"• **14-day RSI Factor:** {latest_rsi:.2f}")
-    st.write(f"• **Brent Oil Input Drag:** ${latest_crude:.2f}/bbl")
+with b_col2:
+    st.markdown(
+        f'<div style="background-color:#1565c0; padding:20px; border-radius:10px; color:white;">'
+        f'<h4>📅 Core Structural Horizon: Next 1 Day Path</h4>'
+        f'<hr style="border-color:white;"/>'
+        f'<p><b>Target End-of-Day Resistance Cap:</b> ₹{proj_1d_high:.2f}</p>'
+        f'<p><b>Target End-of-Day Support Floor:</b> ₹{proj_1d_low:.2f}</p>'
+        f'</div>', 
+        unsafe_with_html=True
+    )
