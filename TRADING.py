@@ -40,10 +40,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚖️ NIFTY 50 COGNITIVE TRADING OPERATIONS")
-st.markdown("<p style='font-size:1rem; font-style:italic; color:#8A92A6; margin-top:-10px;'>Hedge-Profile Multi-Timeframe Analytics Matrix</p>", unsafe_allow_html=True)
+st.title("⚖️ NIFTY 50 RISK MANIPULATION SYSTEM")
+st.markdown("<p style='font-size:1rem; font-style:italic; color:#8A92A6; margin-top:-10px;'>Condition-Driven Threat & Yield Assessment Matrix</p>", unsafe_allow_html=True)
 
-# 2. COMPLETE SELECTION DROPDOWNS
+# 2. SELECTION CONFIGURATIONS
 nifty50_tickers = {
     "Reliance Industries": "RELIANCE", "HDFC Bank": "HDFCBANK", "ICICI Bank": "ICICIBANK",
     "Bharti Airtel": "BHARTIARTL", "State Bank of India": "SBIN", "Infosys": "INFY",
@@ -63,65 +63,63 @@ nifty50_tickers = {
     "Max Healthcare": "MAXHEALTH", "Tata Consumer Products": "TATACONSUM", "ONGC": "ONGC"
 }
 
-st.sidebar.header("🕹️ NAVIGATION PANEL")
+st.sidebar.header("🕹️ CONTROL DASHBOARD")
 selected_stock_name = st.sidebar.selectbox("Select Target Token Asset:", list(nifty50_tickers.keys()))
-timeframe = st.sidebar.selectbox("Choose Technical Interval Horizon:", [
-    "15 Minutes Horizon (1m bars)", 
-    "1 Hour Horizon (1m bars)", 
-    "1 Day Horizon (15m bars)", 
-    "1 Week Horizon (1d bars)", 
-    "1 Month Horizon (1d bars)"
+timeframe = st.sidebar.selectbox("Choose Strategic Window Profile:", [
+    "15 Minutes Strategy (Intraday)", 
+    "1 Hour Strategy (Intraday Scalp)", 
+    "1 Day Strategy (Swing Momentum)", 
+    "1 Week Strategy (Position Cycle)", 
+    "1 Month Strategy (Macro Structural)"
 ])
 ticker_token = nifty50_tickers[selected_stock_name]
 
-# 3. CONVERT SELECTOR TO TIME PARAMETERS
+# Adjust strategy parameters cleanly across intervals
 if "15 Minutes" in timeframe:
     api_range, api_interval = "1d", "1m"
-    projection_steps = 15
+    projection_steps, profit_pct, loss_pct = 15, 0.005, 0.002
     holding_delta = datetime.timedelta(minutes=15)
 elif "1 Hour" in timeframe:
     api_range, api_interval = "2d", "1m"
-    projection_steps = 60
+    projection_steps, profit_pct, loss_pct = 60, 0.015, 0.006
     holding_delta = datetime.timedelta(hours=1)
 elif "1 Day" in timeframe:
     api_range, api_interval = "1mo", "15m"
-    projection_steps = 32
+    projection_steps, profit_pct, loss_pct = 32, 0.035, 0.012
     holding_delta = datetime.timedelta(days=1)
 elif "1 Week" in timeframe:
     api_range, api_interval = "3mo", "1d"
-    projection_steps = 5
+    projection_steps, profit_pct, loss_pct = 5, 0.060, 0.020
     holding_delta = datetime.timedelta(weeks=1)
-else: # 1 Month Horizon
+else: # 1 Month Strategy
     api_range, api_interval = "1y", "1d"
-    projection_steps = 22
+    projection_steps, profit_pct, loss_pct = 22, 0.120, 0.040
     holding_delta = datetime.timedelta(days=30)
 
-# 4. ACTIVE MARKET HOURS FILTER ENGINE
-def calculate_operational_sell_date(duration_delta):
+# 3. SAFETY CLOSURE CALENDAR MANAGEMENT ENGINE
+def get_operational_fuse_deadline(duration_delta):
     current_time = datetime.datetime.now()
     raw_target_time = current_time + duration_delta
     
-    # Define constraints for regular NSE equity operations
     market_open_hour, market_open_minute = 9, 15
     market_close_hour, market_close_minute = 15, 30
 
-    # If target falls after market closure, push target to 9:30 AM of the next open business day
     if raw_target_time.time() > datetime.time(market_close_hour, market_close_minute) or raw_target_time.time() < datetime.time(market_open_hour, market_open_minute):
         if raw_target_time.time() > datetime.time(market_close_hour, market_close_minute):
             raw_target_time += datetime.timedelta(days=1)
         raw_target_time = raw_target_time.replace(hour=9, minute=30, second=0, microsecond=0)
 
-    # Weekend filtration (Saturday=5, Sunday=6)
-    if raw_target_time.weekday() == 5: # Saturday
+    # Filter exchange weekend closures
+    if raw_target_time.weekday() == 5:
         raw_target_time += datetime.timedelta(days=2)
-    elif raw_target_time.weekday() == 6: # Sunday
+    elif raw_target_time.weekday() == 6:
         raw_target_time += datetime.timedelta(days=1)
         
     return raw_target_time.strftime('%Y-%m-%d %I:%M %p IST')
 
-formatted_exit_time = calculate_operational_sell_date(holding_delta)
+formatted_exit_time = get_operational_fuse_deadline(holding_delta)
 
-# 5. REST CALLS TO DATA MATRIX LAYERS
+# 4. REMOTE DATA INTEGRATION PROCESSING
 try:
     stock_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_token}.NS?range={api_range}&interval={api_interval}"
     req_stock = urllib.request.Request(stock_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -137,11 +135,15 @@ try:
     crude_prices = [c for c in crude_data['chart']['result'][0]['indicators']['quote'][0]['close'] if c is not None]
     latest_crude = crude_prices[-1] if crude_prices else 74.0
 except Exception:
-    current_price = 2100.0
+    current_price = 2200.0
     latest_crude = 74.0
-    prices = [2080, 2090, 2100]
+    prices = [2180, 2190, 2200]
 
-# Analytics calculations
+# Strategy Target Calculations
+target_profit_value = current_price * (1 + profit_pct)
+target_stop_value = current_price * (1 - loss_pct)
+
+# Structural technical math blocks
 def run_ema(lst, p):
     if len(lst) < p: p = len(lst)
     k = 2 / (p + 1)
@@ -159,36 +161,36 @@ avg_loss = sum(losses)/14 if losses else 0.5
 rs = avg_gain / (avg_loss + 1e-10)
 latest_rsi = 100 - (100 / (1 + rs))
 
-# 6. SCORING MATRIX SYSTEM EVALUATIONS
+# 5. CORE SCORING LOGIC PROCESSING
 score = 0
 reasons_positive = []
 reasons_negative = []
 
 if current_price > latest_ema_50:
     score += 40
-    reasons_positive.append(f"Price trending cleanly above the matching 50-period moving frame baseline.")
+    reasons_positive.append(f"Price trending safely north of the 50-period moving structural line.")
 else:
-    reasons_negative.append(f"Price registered beneath the 50-period structural trendline vector.")
+    reasons_negative.append(f"Price registered lower than the short-term 50-period structural trendline.")
 
 if current_price > latest_ema_100:
     score += 30
-    reasons_positive.append("Primary macro institutional support layers remain actively defended.")
+    reasons_positive.append("Long-term secondary support layers remain intact.")
 else:
-    reasons_negative.append("Warning: Price slipped under major 100-period support baseline markers.")
+    reasons_negative.append("Asset tracking framework dropped below institutional 100-period support floors.")
 
 if 30 <= latest_rsi <= 65:
     score += 30
-    reasons_positive.append(f"RSI oscillator signals healthy structural room for ongoing trade expansion ({latest_rsi:.1f}).")
+    reasons_positive.append(f"RSI oscillator signals healthy parameters with clear operational runway ({latest_rsi:.1f}).")
 else:
-    reasons_negative.append(f"RSI index metrics record localized over-exhaustion profiles ({latest_rsi:.1f}).")
+    reasons_negative.append(f"RSI reading records localized trend over-exhaustion risk profiles ({latest_rsi:.1f}).")
 
 if latest_crude < 80.0:
     score += 10
-    reasons_positive.append(f"Macro Tailwinds: Stable global crude prices ease manufacturing input drag thresholds.")
+    reasons_positive.append(f"Macro Tailwinds: Depressed crude oil processing curbs retail input pricing layers.")
 else:
-    reasons_negative.append(f"Macro Headwinds: High external commodity prices risk margin compression trends.")
+    reasons_negative.append(f"Macro Headwinds: High external commodity prices risk industrial margin squeezes.")
 
-# 7. RENDER UI MATRIX DISPLAY BOARDS
+# 6. RENDER INTERFACE DISPLAY MATRIX
 st.markdown("---")
 col_v1, col_v2 = st.columns(2)
 
@@ -197,12 +199,14 @@ with col_v1:
     if score >= 75:
         st.markdown(f"<h2>System Analysis: <span class='metric-pass'>BUY OPINION</span></h2>", unsafe_allow_html=True)
         st.markdown(f"<h3>Strategy Matrix Score: <span class='metric-pass'>{score} / 110</span></h3>", unsafe_allow_html=True)
-        st.markdown(f"<h3>Target Operational Sell Time: <span class='metric-info'>{formatted_exit_time}</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3>Take-Profit Target: <span class='metric-pass'>₹{target_profit_value:.2f} (+{profit_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3>Stop-Loss Guard: <span class='metric-fail'>₹{target_stop_value:.2f} (-{loss_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3>Hard Time Fuse Deadline: <span class='metric-info'>{formatted_exit_time}</span></h3>", unsafe_allow_html=True)
     else:
         st.markdown(f"<h2>System Analysis: <span class='metric-fail'>NO BUY (AVOID / HOLD)</span></h2>", unsafe_allow_html=True)
         st.markdown(f"<h3>Strategy Matrix Score: <span class='metric-fail'>{score} / 110</span></h3>", unsafe_allow_html=True)
-        st.markdown(f"<h3>Target Operational Sell Time: <span style='color:#718096;'>N/A (No active entry executed)</span></h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#A0AEC0;'><b>Last Session Price Point:</b> ₹{current_price:.2f}</p>", unsafe_allow_html=True)
+        st.markdown(f"<h3>Hard Time Fuse Deadline: <span style='color:#718096;'>N/A (No entry triggered)</span></h3>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color:#A0AEC0;'><b>Last Frame Traded Price:</b> ₹{current_price:.2f}</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 with col_v2:
@@ -214,21 +218,20 @@ with col_v2:
         st.markdown(f"<p>⚠️ <span class='metric-fail'>Caution:</span> {r}</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 8. OUTPUT GRAPHING PLOTS
+# 7. PERFORMANCE DATA GRAPH LAYERS
 st.markdown("---")
-st.subheader("📊 QUANTITATIVE MODEL FUTURE PROJECTION LINE")
-st.caption("Historical parameters display in charcoal grey, feeding directly into your integrated electric blue forward prediction path.")
+st.subheader("📊 MODEL PERFORMANCE PROJECTION CANVA")
 
 chart_df = pd.DataFrame({
     "Historical Close Trace": prices + [None] * projection_steps,
     "Model Future Path": [None] * (len(prices) - 1) + [current_price] + [
-        current_price * (1 + (i * 0.00022 if score >= 75 else i * -0.00015)) for i in range(1, projection_steps + 1)
+        current_price * (1 + (i * (profit_pct/projection_steps) if score >= 75 else i * -(loss_pct/projection_steps))) for i in range(1, projection_steps + 1)
     ]
 })
 st.line_chart(chart_df, color=["#4A4A5A", "#00BFFF"])
 
 st.markdown("---")
-st.subheader("🖥️ LIVE TRADINGVIEW HIGH-RESOLUTION COMPONENT TERMINAL")
+st.subheader("🖥️ LIVE TRADINGVIEW HIGH-RESOLUTION TERMINAL")
 
 tv_widget_html = f"""
 <div class="tradingview-widget-container" style="height:650px;width:100%;">
