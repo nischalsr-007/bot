@@ -39,7 +39,6 @@ st.markdown("""
         margin-bottom: 15px;
     }
     
-    /* Elegant Clean Design Grid styling for reference sheet */
     .matrix-table {
         width: 100%;
         border-collapse: collapse;
@@ -58,7 +57,6 @@ st.markdown("""
         border: 1px solid #1E1E24;
         background-color: #0F0F14;
     }
-    /* Dynamic active highlight styling for current match */
     .active-row {
         border: 2px solid #D4AF37 !important;
         background-color: #16161D !important;
@@ -68,7 +66,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚖️ NIFTY 50 COGNITIVE RISK MANIPULATION SYSTEM")
-st.markdown("<p style='font-size:1rem; font-style:italic; color:#8A92A6; margin-top:-10px;'>Hedge-Profile Strategy Matrix with Auto-Highlighting Cheat Sheet</p>", unsafe_allow_html=True)
+st.markdown("<p style='font-size:1rem; font-style:italic; color:#8A92A6; margin-top:-10px;'>Condition-Driven Threat & Yield Assessment Matrix</p>", unsafe_allow_html=True)
 
 # 2. SELECTION DROPDOWNS
 nifty50_tickers = {
@@ -123,19 +121,16 @@ else:
     projection_steps, profit_pct, loss_pct = 22, 0.120, 0.040
     holding_delta = datetime.timedelta(days=30)
 
-# 3. BACKGROUND MULTI-TIMEFRAME PARSING ENGINE
+# 3. BACKGROUND SCANS
 @st.cache_data(ttl=60)
 def scan_all_timeframes(token):
-    # Base indicators mapping dictionary
     status = {"1M": "RED", "1W": "RED", "1D": "RED", "1H": "RED", "15m": "RED", "current_price": 1500.0}
-    
     def get_ema(lst, p):
         if len(lst) < p: p = len(lst)
         k = 2 / (p + 1)
         e = lst[0]
         for x in lst[1:]: e = (x * k) + (e * (1 - k))
         return e
-
     configs = [
         ("1M", f"https://query1.finance.yahoo.com/v8/finance/chart/{token}.NS?range=1y&interval=1d", 50),
         ("1W", f"https://query1.finance.yahoo.com/v8/finance/chart/{token}.NS?range=3mo&interval=1d", 50),
@@ -143,7 +138,6 @@ def scan_all_timeframes(token):
         ("1H", f"https://query1.finance.yahoo.com/v8/finance/chart/{token}.NS?range=2d&interval=1m", 50),
         ("15m", f"https://query1.finance.yahoo.com/v8/finance/chart/{token}.NS?range=1d&interval=1m", 50)
     ]
-    
     for label, url, period in configs:
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -151,25 +145,18 @@ def scan_all_timeframes(token):
                 data = json.loads(resp.read().decode())
             raw_prices = data['chart']['result'][0]['indicators']['quote'][0]['close']
             prices = [p for p in raw_prices if p is not None]
-            
             if prices:
                 if label == "1M": status["current_price"] = prices[-1]
-                ema_val = get_ema(prices, period)
-                if prices[-1] > ema_val:
-                    status[label] = "GREEN"
-        except Exception:
-            pass
-            
+                if prices[-1] > get_ema(prices, period): status[label] = "GREEN"
+        except Exception: pass
     return status
 
-# Run background scans across all intervals simultaneously
 timeframe_status = scan_all_timeframes(ticker_token)
 current_price = timeframe_status["current_price"]
 
 target_profit_value = current_price * (1 + profit_pct)
 target_stop_value = current_price * (1 - loss_pct)
 
-# Fuse deadline calculation
 def get_operational_fuse_deadline(duration_delta):
     current_time = datetime.datetime.now()
     raw_target_time = current_time + duration_delta
@@ -182,25 +169,23 @@ def get_operational_fuse_deadline(duration_delta):
 
 formatted_exit_time = get_operational_fuse_deadline(holding_delta)
 
-# Set the primary display score based on user's active choice
 active_label = "15m" if "15 Minutes" in timeframe else "1H" if "1 Hour" in timeframe else "1D" if "1 Day" in timeframe else "1W" if "1 Week" in timeframe else "1M"
-active_status = timeframe_status[active_label]
-score = 100 if active_status == "GREEN" else 40
+score = 100 if timeframe_status[active_label] == "GREEN" else 40
 
-# 4. RENDER UI CONTAINERS
+# 4. UI INTERFACE DISPLAY
 col_v1, col_v2 = st.columns(2)
 
 with col_v1:
     st.markdown("<div class='premium-card'>", unsafe_allow_html=True)
     if score >= 75:
-        st.markdown(f"<h2>System Analysis: <span class='metric-pass'>BUY OPINION ({active_label})</span></h2>", unsafe_allow_html=True)
-        st.markdown(f"<h3>Take-Profit Target: <span class='metric-pass'>₹{target_profit_value:.2f} (+{profit_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
-        st.markdown(f"<h3>Stop-Loss Guard: <span class='metric-fail'>₹{target_stop_value:.2f} (-{loss_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
-        st.markdown(f"<h3>Hard Time Fuse Deadline: <span class='metric-info'>{formatted_exit_time}</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h2>🚨 LIVE TRADING EXIT BLUEPRINT</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h3>🎯 Take-Profit Target (Limit Sell): <span class='metric-pass'>₹{target_profit_value:.2f} (+{profit_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3>🛑 Stop-Loss Guard (Safety Floor): <span class='metric-fail'>₹{target_stop_value:.2f} (-{loss_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3>⏳ Hard Time Fuse (Deadline Exit): <span class='metric-info'>{formatted_exit_time}</span></h3>", unsafe_allow_html=True)
     else:
-        st.markdown(f"<h2>System Analysis: <span class='metric-fail'>NO BUY / AVOID ({active_label})</span></h2>", unsafe_allow_html=True)
-        st.markdown(f"<h3>Hard Time Fuse Deadline: <span style='color:#718096;'>N/A (No entry triggered)</span></h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#A0AEC0;'><b>Last Frame Traded Price:</b> ₹{current_price:.2f}</p>", unsafe_allow_html=True)
+        st.markdown(f"<h2>System Analysis: <span class='metric-fail'>NO BUY / AVOID PROFILE</span></h2>", unsafe_allow_html=True)
+        st.markdown("<p>Strategic metrics indicate negative historical alignment. Do not initiate entry.</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color:#A0AEC0;'><b>Current Asset Spot Value:</b> ₹{current_price:.2f}</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 with col_v2:
@@ -211,9 +196,8 @@ with col_v2:
         st.markdown(f"<p>⏱️ **{tf} Interval Baseline:** <span class='{color_class}'>{timeframe_status[tf]}</span></p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 5. GRAPHING PLOTS
-st.subheader("📊 QUANTITATIVE MODEL PERFORMANCE PROJECTION")
-# Fake tracking list compilation for visualization engine
+# Graph blocks
+st.subheader("📊 MODEL PERFORMANCE PROJECTION")
 vis_prices = [current_price * (0.99 + (i*0.001)) for i in range(50)]
 chart_df = pd.DataFrame({
     "Historical Close Trace": vis_prices + [None] * projection_steps,
@@ -225,24 +209,21 @@ st.line_chart(chart_df, color=["#4A4A5A", "#00BFFF"])
 
 st.subheader("🖥️ LIVE TRADINGVIEW HIGH-RESOLUTION TERMINAL")
 tv_widget_html = f"""
-<div class="tradingview-widget-container" style="height:500px;width:100%;">
-  <div id="tradingview_operational_terminal" style="height:500px;"></div>
+<div class="tradingview-widget-container" style="height:450px;width:100%;">
+  <div id="tradingview_operational_terminal" style="height:450px;"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
-  new TradingView.widget({{ "width": "100%", "height": 500, "symbol": "NSE:{ticker_token}", "interval": "D", "timezone": "Asia/Kolkata", "theme": "dark", "style": "1", "locale": "en", "toolbar_bg": "#0A0A0C", "enable_publishing": false, "hide_side_toolbar": false, "container_id": "tradingview_operational_terminal" }});
+  new TradingView.widget({{ "width": "100%", "height": 450, "symbol": "NSE:{ticker_token}", "interval": "D", "timezone": "Asia/Kolkata", "theme": "dark", "style": "1", "locale": "en", "toolbar_bg": "#0A0A0C", "enable_publishing": false, "hide_side_toolbar": false, "container_id": "tradingview_operational_terminal" }});
   </script>
 </div>
 """
-components.html(tv_widget_html, height=510)
+components.html(tv_widget_html, height=460)
 
-# 6. AUTOMATED AUTO-HIGHLIGHTING CHEAT SHEET MATRIX
+# 5. DYNAMIC CHEAT SHEET MATRIX
 st.markdown("---")
 st.header("📖 AUTOMATED MULTI-TIMEFRAME TIMELINE ALIGNMENT CHEAT SHEET")
-st.markdown("The system automatically checks all structural trends and applies a **gold highlighted frame border** around the strategy row that fits your stock right now.")
 
-# Establish boolean flag rows for table processing
-s_1m, s_1w, s_1d, s_1h, s_15 = timeframe_status["1M"], timeframe_status["1W"], timeframe_status["1D"], timeframe_status["1H"], timeframe_status["15m"]
-
+s_1m, s_1w, s_1d, s_1h = timeframe_status["1M"], timeframe_status["1W"], timeframe_status["1D"], timeframe_status["1H"]
 row1_class = "class='active-row'" if (s_1m == "GREEN" and s_1w == "GREEN" and s_1d == "GREEN" and s_1h == "GREEN") else ""
 row2_class = "class='active-row'" if (s_1m == "GREEN" and s_1w == "GREEN" and s_1d == "GREEN" and s_1h == "RED") else ""
 row3_class = "class='active-row'" if (s_1m == "GREEN" and s_1w == "GREEN" and s_1d == "RED") else ""
