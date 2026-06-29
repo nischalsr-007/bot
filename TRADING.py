@@ -89,7 +89,7 @@ nifty50_tickers = {
     "Tata Steel": "TATASTEEL", "Jio Financial Services": "JIOFIN", "Trent Limited": "TRENT",
     "Hindalco Industries": "HINDALCO", "Bharat Electronics": "BEL", "Tech Mahindra": "TECHM",
     "Grasim Industries": "GRASIM", "Adani Enterprises": "ADANIENT", "IndiGo (InterGlobe)": "INDIGO",
-    "Wipro": "Wipro", "Apollo Hospitals": "APOLLOHOSP", "Cipla": "CIPLA", "Dr. Reddy's": "DRREDDY",
+    "Wipro": "WIPRO", "Apollo Hospitals": "APOLLOHOSP", "Cipla": "CIPLA", "Dr. Reddy's": "DRREDDY",
     "Eicher Motors": "EICHERMOT", "Bajaj Auto": "BAJAJ-AUTO", "Bajaj Finserv": "BAJAJFINSV",
     "Nestle India": "NESTLEIND", "Shriram Finance": "SHRIRAMFIN", "HDFC Life": "HDFCLIFE",
     "SBI Life": "SBILIFE", "Asian Paints": "ASIANPAINT", "JSW Steel": "JSWSTEEL",
@@ -129,10 +129,13 @@ else: # 1 Month Strategy
     projection_steps, profit_pct, loss_pct = 22, 0.120, 0.040
     holding_delta = datetime.timedelta(days=30)
 
-# 3. HIGH-SPEED SYCHRONOUS MULTI-TIMEFRAME PARSING ENGINE
+# 3. HIGH-SPEED SYNCHRONOUS MULTI-TIMEFRAME PARSING ENGINE
 @st.cache_data(ttl=60)
 def scan_all_timeframes(token):
-    status = {"1M": "RED", "1W": "RED", "1D": "RED", "1H": "RED", "15m": "RED", "current_price": 1500.0}
+    status = {
+        "1M": "RED", "1W": "RED", "1D": "RED", "1H": "RED", "15m": "RED", 
+        "current_price": 1500.0, "ema_50": 1500.0, "ema_100": 1500.0, "rsi": 50.0, "crude": 74.0
+    }
     
     def get_ema(lst, p):
         if len(lst) < p: p = len(lst)
@@ -149,6 +152,41 @@ def scan_all_timeframes(token):
         ("15m", f"https://query1.finance.yahoo.com/v8/finance/chart/{token}.NS?range=1d&interval=1m", 50)
     ]
     
+    # Process historical indicators for the active chosen timeline
+    try:
+        active_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{token}.NS?range={api_range}&interval={api_interval}"
+        req_active = urllib.request.Request(active_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_active) as resp:
+            active_data = json.loads(resp.read().decode())
+        raw_active_prices = active_data['chart']['result'][0]['indicators']['quote'][0]['close']
+        active_prices = [p for p in raw_active_prices if p is not None]
+        
+        if active_prices:
+            status["ema_50"] = get_ema(active_prices, 50)
+            status["ema_100"] = get_ema(active_prices, 100)
+            
+            # RSI Engine logic execution
+            gains = [active_prices[i] - active_prices[i-1] for i in range(1, len(active_prices[-15:])) if active_prices[i] > active_prices[i-1]]
+            losses = [abs(active_prices[i] - active_prices[i-1]) for i in range(1, len(active_prices[-15:])) if active_prices[i] < active_prices[i-1]]
+            avg_gain = sum(gains)/14 if gains else 0.5
+            avg_loss = sum(losses)/14 if losses else 0.5
+            rs = avg_gain / (avg_loss + 1e-10)
+            status["rsi"] = 100 - (100 / (1 + rs))
+    except Exception:
+        pass
+
+    # Fetch Brent Crude Oil Spot Price
+    try:
+        crude_url = "https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?range=5d&interval=1d"
+        req_crude = urllib.request.Request(crude_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_crude) as resp_crude:
+            crude_data = json.loads(resp_crude.read().decode())
+        crude_list = [c for c in crude_data['chart']['result'][0]['indicators']['quote'][0]['close'] if c is not None]
+        if crude_list: status["crude"] = crude_list[-1]
+    except Exception:
+        pass
+    
+    # Run historical loops for the matrix check boxes
     for label, url, period in configs:
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -169,6 +207,10 @@ def scan_all_timeframes(token):
 # Run the live network thread scanner
 timeframe_status = scan_all_timeframes(ticker_token)
 current_price = timeframe_status["current_price"]
+latest_ema_50 = timeframe_status["ema_50"]
+latest_ema_100 = timeframe_status["ema_100"]
+latest_rsi = timeframe_status["rsi"]
+latest_crude = timeframe_status["crude"]
 
 # Calculate Dynamic Real-Time Exits
 target_profit_value = current_price * (1 + profit_pct)
@@ -187,38 +229,66 @@ def get_operational_fuse_deadline(duration_delta):
 
 formatted_exit_time = get_operational_fuse_deadline(holding_delta)
 
-# Isolate the targeted timeframe label for core strategy calculations
-active_label = "15m" if "15 Minutes" in timeframe else "1H" if "1 Hour" in timeframe else "1D" if "1 Day" in timeframe else "1W" if "1 Week" in timeframe else "1M"
-score = 100 if timeframe_status[active_label] == "GREEN" else 40
+# 4. SCORING MATRIX ENGINE WITH METRIC REASON LOGGING
+score = 0
+reasons_positive = []
+reasons_negative = []
 
-# 4. RENDER TERMINAL WORKSPACE DISPLAY CARDS
+if current_price > latest_ema_50:
+    score += 40
+    reasons_positive.append(f"Price sits above its 50-period moving base (₹{latest_ema_50:.2f}), confirming positive trend velocity.")
+else:
+    reasons_negative.append(f"Price sits below its 50-period trendline baseline (₹{latest_ema_50:.2f}), tracking localized near-term weakness.")
+
+if current_price > latest_ema_100:
+    score += 30
+    reasons_positive.append(f"Secondary core institutional support floor layer (100 EMA: ₹{latest_ema_100:.2f}) remains fully intact.")
+else:
+    reasons_negative.append(f"Warning: Price broken down under major 100-period support baseline structures (₹{latest_ema_100:.2f}).")
+
+if 30 <= latest_rsi <= 65:
+    score += 30
+    reasons_positive.append(f"RSI indicator tracks neutral, safe velocity thresholds ({latest_rsi:.1f}) with massive upward runway available.")
+else:
+    reasons_negative.append(f"RSI calculation notes localized price over-exhaustion risk parameters ({latest_rsi:.1f}).")
+
+if latest_crude < 80.0:
+    score += 10
+    reasons_positive.append(f"Macro Tailwinds: Brent Crude trading down at ${latest_crude:.2f}/bbl, easing retail corporate margin input drag.")
+else:
+    reasons_negative.append(f"Macro Headwinds: High global oil market values (${latest_crude:.2f}/bbl) pose near-term corporate margin squeeze threats.")
+
+active_label = "15m" if "15 Minutes" in timeframe else "1H" if "1 Hour" in timeframe else "1D" if "1 Day" in timeframe else "1W" if "1 Week" in timeframe else "1M"
+
+# 5. RENDER TERMINAL WORKSPACE DISPLAY CARDS
 col_v1, col_v2 = st.columns(2)
 
 with col_v1:
     st.markdown("<div class='premium-card'>", unsafe_allow_html=True)
     if score >= 75:
         st.markdown(f"<h2>🚨 LIVE TRADING EXIT BLUEPRINT ({active_label})</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h3>📈 Strategy Score Matrix: <span class='metric-pass'>{score} / 110 (STRATEGY PASSED)</span></h3>", unsafe_allow_html=True)
         st.markdown(f"<h3>🎯 Take-Profit Target (Limit Sell): <span class='metric-pass'>₹{target_profit_value:.2f} (+{profit_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
         st.markdown(f"<h3>🛑 Stop-Loss Guard (Safety Floor): <span class='metric-fail'>₹{target_stop_value:.2f} (-{loss_pct*100:.1f}%)</span></h3>", unsafe_allow_html=True)
         st.markdown(f"<h3>⏳ Hard Time Fuse (Deadline Exit): <span class='metric-info'>{formatted_exit_time}</span></h3>", unsafe_allow_html=True)
     else:
         st.markdown(f"<h2>System Analysis: <span class='metric-fail'>NO BUY / AVOID PROFILE ({active_label})</span></h2>", unsafe_allow_html=True)
-        st.markdown("<p style='color:#A0AEC0;'>The active timeframe baseline trend is currently bearish. Do not execute position entry.</p>", unsafe_allow_html=True)
+        st.markdown(f"<h3>📈 Strategy Score Matrix: <span class='metric-fail'>{score} / 110 (STRATEGY FAILED)</span></h3>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#A0AEC0;'>The strategy conditions are structurally bearish. Do not execute position entry entries.</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='color:#A0AEC0; margin-top:10px;'><b>Current Asset Spot Value:</b> ₹{current_price:.2f}</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 with col_v2:
     st.markdown("<div class='premium-card' style='height:100%;'>", unsafe_allow_html=True)
-    st.markdown("<h3>📋 REAL-TIME TIME-FRAME STATUS LOG</h3>", unsafe_allow_html=True)
-    for tf in ["1M", "1W", "1D", "1H", "15m"]:
-        color_class = "metric-pass" if timeframe_status[tf] == "GREEN" else "metric-fail"
-        label_text = "BULLISH / GREEN" if timeframe_status[tf] == "GREEN" else "BEARISH / RED"
-        st.markdown(f"<p>⏱️ **{tf} Interval Baseline:** <span class='{color_class}'>{label_text}</span></p>", unsafe_allow_html=True)
+    st.markdown("<h3>📋 SIGNAL FACTOR METRIC REASONING BREAKDOWN</h3>", unsafe_allow_html=True)
+    for r in reasons_positive: 
+        st.markdown(f"<p>🏁 <span class='metric-pass'>Passed:</span> {r}</p>", unsafe_allow_html=True)
+    for r in reasons_negative: 
+        st.markdown(f"<p>⚠️ <span class='metric-fail'>Caution:</span> {r}</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 5. DUAL HIGH-RESOLUTION VISUALIZATION BLOCKS
+# 6. DUAL HIGH-RESOLUTION VISUALIZATION BLOCKS
 st.subheader("📊 QUANTITATIVE MODEL PERFORMANCE PROJECTION")
-# Compiling baseline historical array trace for chart engine execution
 vis_prices = [current_price * (0.985 + (i*0.0003)) for i in range(50)]
 chart_df = pd.DataFrame({
     "Historical Close Trace": vis_prices + [None] * projection_steps,
@@ -230,13 +300,13 @@ st.line_chart(chart_df, color=["#4A4A5A", "#00BFFF"])
 
 st.subheader("🖥️ LIVE TRADINGVIEW HIGH-RESOLUTION COMPONENT TERMINAL")
 tv_widget_html = f"""
-<div class="tradingview-widget-container" style="height:550px;width:100%;">
-  <div id="tradingview_operational_terminal" style="height:550px;"></div>
+<div class="tradingview-widget-container" style="height:450px;width:100%;">
+  <div id="tradingview_operational_terminal" style="height:450px;"></div>
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <script type="text/javascript">
   new TradingView.widget({{ 
     "width": "100%", 
-    "height": 550, 
+    "height": 450, 
     "symbol": "NSE:{ticker_token}", 
     "interval": "D", 
     "timezone": "Asia/Kolkata", 
@@ -244,21 +314,18 @@ tv_widget_html = f"""
     "style": "1", 
     "locale": "en", 
     "toolbar_bg": "#0A0A0C", 
-    "enable_publishing": false, 
-    "hide_side_toolbar": false, 
     "container_id": "tradingview_operational_terminal" 
   }});
   </script>
 </div>
 """
-components.html(tv_widget_html, height=560)
+components.html(tv_widget_html, height=460)
 
-# 6. AUTOMATED DYNAMIC CHEAT SHEET MATRIX OVERHAUL
+# 7. AUTOMATED DYNAMIC CHEAT SHEET MATRIX OVERHAUL
 st.markdown("---")
 st.header("📖 AUTOMATED MULTI-TIMEFRAME TIMELINE ALIGNMENT CHEAT SHEET")
 st.markdown("The system analyzes your chosen asset across all parameters simultaneously and maps out a **Gold Highlighted Box Border** over the current active market scenario.")
 
-# Establish boolean flag triggers for table mapping
 s_1m, s_1w, s_1d, s_1h = timeframe_status["1M"], timeframe_status["1W"], timeframe_status["1D"], timeframe_status["1H"]
 
 row1_class = "class='active-row'" if (s_1m == "GREEN" and s_1w == "GREEN" and s_1d == "GREEN" and s_1h == "GREEN") else ""
